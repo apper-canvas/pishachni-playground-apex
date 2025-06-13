@@ -1,24 +1,30 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import GameHUD from '@/components/molecules/GameHUD';
-import MansionMap from '@/components/molecules/MansionMap';
-import MiniGameInterface from '@/components/molecules/MiniGameInterface';
 import GameOverModal from '@/components/organisms/GameOverModal';
-import { gameSessionService, playerService, miniGameService } from '@/services';
+import { gameSessionService, playerService } from '@/services';
 import { toast } from 'react-toastify';
 
 const Game = () => {
   const navigate = useNavigate();
+  const gameLoopRef = useRef();
   const [gameSession, setGameSession] = useState(null);
-  const [currentRoom, setCurrentRoom] = useState('mansion-entrance');
-  const [completedRooms, setCompletedRooms] = useState([]);
-  const [activeMiniGame, setActiveMiniGame] = useState(null);
   const [gameState, setGameState] = useState('playing'); // playing, paused, gameOver
   const [gameStartTime, setGameStartTime] = useState(Date.now());
-  const [pishachniWarning, setPishachniWarning] = useState(false);
   const [showGameOver, setShowGameOver] = useState(false);
   const [gameOverData, setGameOverData] = useState({});
+
+  // Runner game state
+  const [playerY, setPlayerY] = useState(50); // Player vertical position (percentage)
+  const [isJumping, setIsJumping] = useState(false);
+  const [isDucking, setIsDucking] = useState(false);
+  const [obstacles, setObstacles] = useState([]);
+  const [gameSpeed, setGameSpeed] = useState(2);
+  const [distance, setDistance] = useState(0);
+  const [backgroundOffset, setBackgroundOffset] = useState(0);
+  const [pishachniDistance, setPishachniDistance] = useState(100);
+  const [pishachniWarning, setPishachniWarning] = useState(false);
 
   // Game timer
   useEffect(() => {
@@ -38,17 +44,47 @@ const Game = () => {
     initializeGame();
   }, []);
 
-  // Pishachni random appearances
+  // Main game loop
   useEffect(() => {
-    if (gameState === 'playing' && !activeMiniGame) {
-      const pishachniTimer = setInterval(() => {
-        if (Math.random() < 0.1) { // 10% chance every 3 seconds
-          showPishachniWarning();
-        }
-      }, 3000);
-      return () => clearInterval(pishachniTimer);
+    if (gameState === 'playing') {
+      gameLoopRef.current = setInterval(() => {
+        updateGame();
+      }, 50); // 20 FPS
+      return () => clearInterval(gameLoopRef.current);
     }
-  }, [gameState, activeMiniGame]);
+  }, [gameState, playerY, obstacles, gameSpeed]);
+
+  // Keyboard controls
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      if (gameState !== 'playing') return;
+      
+      switch (event.code) {
+        case 'Space':
+        case 'ArrowUp':
+          event.preventDefault();
+          handleJump();
+          break;
+        case 'ArrowDown':
+          event.preventDefault();
+          handleDuck();
+          break;
+      }
+    };
+
+    const handleKeyUp = (event) => {
+      if (event.code === 'ArrowDown') {
+        setIsDucking(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [gameState, isJumping]);
 
   const initializeGame = async () => {
     try {
@@ -66,69 +102,129 @@ const Game = () => {
     }
   };
 
+  const updateGame = () => {
+    // Update background scroll
+    setBackgroundOffset(prev => (prev + gameSpeed) % 100);
+    
+    // Update distance and score
+    setDistance(prev => {
+      const newDistance = prev + gameSpeed;
+      if (gameSession) {
+        const newScore = Math.floor(newDistance / 10);
+        setGameSession(prevSession => ({
+          ...prevSession,
+          score: newScore
+        }));
+      }
+      return newDistance;
+    });
+
+    // Increase game speed over time
+    setGameSpeed(prev => Math.min(prev + 0.001, 6));
+
+    // Generate obstacles
+    setObstacles(prev => {
+      let newObstacles = [...prev];
+      
+      // Add new obstacles randomly
+      if (Math.random() < 0.02 + (gameSpeed * 0.005)) {
+        const obstacleTypes = ['cow', 'rock', 'tree'];
+        const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+        newObstacles.push({
+          id: Date.now(),
+          type,
+          x: 100,
+          y: type === 'rock' ? 75 : 70,
+          width: type === 'cow' ? 12 : 8,
+          height: type === 'cow' ? 15 : 10
+        });
+      }
+
+      // Move obstacles left
+      newObstacles = newObstacles.map(obstacle => ({
+        ...obstacle,
+        x: obstacle.x - gameSpeed
+      }));
+
+      // Remove off-screen obstacles
+      newObstacles = newObstacles.filter(obstacle => obstacle.x > -10);
+
+      return newObstacles;
+    });
+
+    // Update Pishachni chase
+    setPishachniDistance(prev => {
+      const newDistance = Math.max(prev - 0.1, 20);
+      if (newDistance < 30 && !pishachniWarning) {
+        showPishachniWarning();
+      }
+      return newDistance;
+    });
+
+    // Check collisions
+    checkCollisions();
+  };
+
+  const checkCollisions = () => {
+    const playerRect = {
+      x: 15,
+      y: isDucking ? playerY + 5 : playerY,
+      width: 8,
+      height: isDucking ? 10 : 15
+    };
+
+    obstacles.forEach(obstacle => {
+      if (
+        playerRect.x < obstacle.x + obstacle.width &&
+        playerRect.x + playerRect.width > obstacle.x &&
+        playerRect.y < obstacle.y + obstacle.height &&
+        playerRect.y + playerRect.height > obstacle.y
+      ) {
+        handleCollision(obstacle.type);
+      }
+    });
+  };
+
+  const handleCollision = (obstacleType) => {
+    const messages = {
+      cow: "You ran into a sacred cow! 🐄",
+      rock: "You tripped over a rock! 🪨", 
+      tree: "You crashed into a tree! 🌳"
+    };
+    handleLifeLoss(messages[obstacleType] || "You hit an obstacle!");
+  };
+
+  const handleJump = () => {
+    if (isJumping || isDucking) return;
+    
+    setIsJumping(true);
+    setPlayerY(25); // Jump height
+    
+    setTimeout(() => {
+      setPlayerY(50); // Return to ground
+      setTimeout(() => {
+        setIsJumping(false);
+      }, 100);
+    }, 300);
+  };
+
+  const handleDuck = () => {
+    if (isJumping) return;
+    setIsDucking(true);
+    setPlayerY(55); // Duck position
+  };
+
   const showPishachniWarning = () => {
     setPishachniWarning(true);
-    // Screen shake effect
     document.body.style.animation = 'shake 0.5s ease-in-out';
     setTimeout(() => {
       setPishachniWarning(false);
       document.body.style.animation = '';
-      // Small chance of losing a life
-      if (Math.random() < 0.2) {
-        handleLifeLoss("Pishachni surprised you!");
+      // Pishachni catch chance increases as she gets closer
+      if (pishachniDistance < 25 && Math.random() < 0.3) {
+        handleLifeLoss("Pishachni caught up to you!");
       }
     }, 1500);
-  };
-
-  const handleRoomSelect = async (roomId) => {
-    if (roomId === currentRoom) return;
-    
-    setCurrentRoom(roomId);
-    
-    // Load mini-game for this room
-    try {
-      const miniGame = await miniGameService.generateRandomChallenge(roomId);
-      if (miniGame) {
-        setActiveMiniGame(miniGame);
-      }
-    } catch (error) {
-      console.error('Failed to load mini-game:', error);
-    }
-  };
-
-  const handleMiniGameComplete = async (score) => {
-    if (!gameSession || !activeMiniGame) return;
-    
-    try {
-      // Update session score
-      const newScore = gameSession.score + score;
-      await gameSessionService.update(gameSession.id, { score: newScore });
-      
-      // Mark room as completed
-      if (!completedRooms.includes(currentRoom)) {
-        setCompletedRooms(prev => [...prev, currentRoom]);
-      }
-      
-      // Update game session
-      setGameSession(prev => ({ ...prev, score: newScore }));
-      setActiveMiniGame(null);
-      
-      toast.success(`Room completed! +${score} points!`);
-      
-      // Check if all rooms completed
-      const allRooms = ['mansion-entrance', 'garlic-kitchen', 'dance-hall', 'bathroom', 'mirror-room'];
-      const newCompletedRooms = [...completedRooms, currentRoom];
-      if (newCompletedRooms.length >= allRooms.length) {
-        handleGameWin();
-      }
-    } catch (error) {
-      toast.error('Failed to save progress');
-    }
-  };
-
-  const handleMiniGameFail = () => {
-    setActiveMiniGame(null);
-    handleLifeLoss("Failed the challenge!");
   };
 
   const handleLifeLoss = async (reason) => {
@@ -142,6 +238,8 @@ const Game = () => {
         handleGameOver(reason);
       } else {
         toast.warn(`${reason} Lives remaining: ${updatedSession.lives}`);
+        // Reset Pishachni distance slightly
+        setPishachniDistance(prev => Math.min(prev + 10, 100));
       }
     } catch (error) {
       toast.error('Game error occurred');
@@ -154,7 +252,6 @@ const Game = () => {
     setGameState('gameOver');
     
     try {
-      // Update high score if needed
       const player = await playerService.getCurrentPlayer();
       const isNewRecord = gameSession.score > (player?.highScore || 0);
       
@@ -175,41 +272,17 @@ const Game = () => {
     }
   };
 
-  const handleGameWin = async () => {
-    if (!gameSession) return;
-    
-    const bonusScore = 1000;
-    const finalScore = gameSession.score + bonusScore;
-    
-    try {
-      await gameSessionService.update(gameSession.id, { score: finalScore });
-      const player = await playerService.getCurrentPlayer();
-      const isNewRecord = finalScore > (player?.highScore || 0);
-      
-      if (isNewRecord) {
-        await playerService.updateHighScore('player-1', finalScore);
-      }
-      
-      setGameOverData({
-        score: finalScore,
-        highScore: player?.highScore || 0,
-        isNewRecord,
-        deathMessage: "Congratulations! You've escaped Pishachni's mansion! 🎉"
-      });
-      
-      setShowGameOver(true);
-      toast.success('You won! All rooms completed!');
-    } catch (error) {
-      console.error('Failed to save victory:', error);
-    }
-  };
-
   const handleRestart = () => {
     setShowGameOver(false);
     setGameState('playing');
-    setCurrentRoom('mansion-entrance');
-    setCompletedRooms([]);
-    setActiveMiniGame(null);
+    setPlayerY(50);
+    setIsJumping(false);
+    setIsDucking(false);
+    setObstacles([]);
+    setGameSpeed(2);
+    setDistance(0);
+    setBackgroundOffset(0);
+    setPishachniDistance(100);
     initializeGame();
   };
 
@@ -221,15 +294,15 @@ const Game = () => {
     return (
       <div className="min-h-screen bg-game-bg flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4 animate-bounce">👻</div>
-          <p className="text-white font-body text-lg">Loading your adventure...</p>
+          <div className="text-6xl mb-4 animate-bounce">🏃</div>
+          <p className="text-white font-body text-lg">Preparing your escape...</p>
         </div>
       </div>
     );
   }
 
-return (
-<div className="min-h-screen bg-gradient-to-b from-game-bg to-purple-900 overflow-auto scrollbar-theme">
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-orange-200 via-yellow-100 to-green-200 overflow-hidden">
       {/* Game HUD */}
       <div className="relative z-20">
         <GameHUD
@@ -237,67 +310,132 @@ return (
           lives={gameSession.lives}
           timeElapsed={gameSession.timeElapsed}
           activePowerUps={gameSession.activePowerUps || []}
-          currentRoom={currentRoom}
+          currentRoom={`Distance: ${Math.floor(distance)}m`}
           className="m-4"
         />
       </div>
 
-{/* Main Game Area */}
-<div className="flex-1 p-4 relative overflow-y-auto overflow-x-hidden scrollbar-theme">
-        <AnimatePresence mode="wait">
-          {activeMiniGame ? (
-            <motion.div
-              key="minigame"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="h-full flex items-center justify-center"
-            >
-              <MiniGameInterface
-                gameType={activeMiniGame.taskType}
-                timeLimit={activeMiniGame.timeLimit}
-                onComplete={handleMiniGameComplete}
-                onFail={handleMiniGameFail}
-                className="w-full max-w-md"
-              />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="mansion"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="h-full flex flex-col items-center justify-center"
-            >
-              <MansionMap
-                currentRoom={currentRoom}
-                completedRooms={completedRooms}
-                onRoomSelect={handleRoomSelect}
-                className="w-full max-w-lg mb-6"
-              />
-              
-              <div className="text-center">
-                <p className="text-white font-body mb-4">
-                  Tap a room to enter and face the challenge!
-                </p>
-                <div className="flex space-x-4">
-                  <button
-                    onClick={handlePause}
-                    className="bg-game-panel border-2 border-warning text-warning px-4 py-2 rounded-lg font-body"
-                  >
-                    {gameState === 'paused' ? '▶️ Resume' : '⏸️ Pause'}
-                  </button>
-                  <button
-                    onClick={() => navigate('/home')}
-                    className="bg-game-panel border-2 border-error text-error px-4 py-2 rounded-lg font-body"
-                  >
-                    🏠 Quit
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* Game Canvas */}
+      <div className="relative h-96 overflow-hidden">
+        {/* Scrolling Background */}
+        <div className="absolute inset-0">
+          {/* Sky */}
+          <div className="absolute inset-0 bg-gradient-to-b from-blue-400 to-orange-200"></div>
+          
+          {/* Mountains */}
+          <div 
+            className="absolute bottom-0 w-full h-32 opacity-30"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0,100 L20,60 L40,80 L60,40 L80,70 L100,50 L100,100 Z' fill='%23654321'/%3E%3C/svg%3E")`,
+              backgroundSize: '200px 100px',
+              backgroundRepeat: 'repeat-x',
+              transform: `translateX(-${backgroundOffset * 0.5}px)`
+            }}
+          ></div>
+          
+          {/* Ground */}
+          <div className="absolute bottom-0 w-full h-24 bg-green-400"></div>
+          <div 
+            className="absolute bottom-0 w-full h-4 bg-yellow-600"
+            style={{
+              backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 10px, #8B4513 10px, #8B4513 12px)`,
+              transform: `translateX(-${backgroundOffset * 2}px)`
+            }}
+          ></div>
+        </div>
+
+        {/* Player Character */}
+        <motion.div
+          className="absolute z-10 text-4xl"
+          style={{ 
+            left: '15%', 
+            bottom: `${100 - playerY - 15}%`,
+            transform: isDucking ? 'scaleY(0.7)' : 'scaleY(1)'
+          }}
+          animate={{ 
+            rotate: isJumping ? [0, 360] : 0,
+            y: isJumping ? [0, -20, 0] : 0
+          }}
+          transition={{ duration: 0.3 }}
+        >
+          🏃‍♂️
+        </motion.div>
+
+        {/* Obstacles */}
+        {obstacles.map(obstacle => (
+          <div
+            key={obstacle.id}
+            className="absolute z-5 text-2xl"
+            style={{
+              left: `${obstacle.x}%`,
+              bottom: `${100 - obstacle.y - obstacle.height}%`,
+            }}
+          >
+            {obstacle.type === 'cow' && '🐄'}
+            {obstacle.type === 'rock' && '🪨'}
+            {obstacle.type === 'tree' && '🌳'}
+          </div>
+        ))}
+
+        {/* Pishachni Chasing */}
+        <motion.div
+          className="absolute z-5 text-5xl"
+          style={{ 
+            left: `${Math.max(-10, -pishachniDistance + 10)}%`, 
+            bottom: '25%' 
+          }}
+          animate={{ 
+            scale: [1, 1.1, 1],
+            x: [0, 10, 0]
+          }}
+          transition={{ 
+            duration: 1, 
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        >
+          👻
+        </motion.div>
+
+        {/* Control Instructions */}
+        <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white p-3 rounded-lg text-sm">
+          <p>⬆️ SPACE/UP: Jump</p>
+          <p>⬇️ DOWN: Duck</p>
+          <p>🏃‍♂️ Avoid obstacles!</p>
+        </div>
+      </div>
+
+      {/* Game Controls */}
+      <div className="flex justify-center space-x-4 mt-6">
+        <button
+          onClick={handlePause}
+          className="bg-game-panel border-2 border-warning text-warning px-6 py-3 rounded-lg font-body text-lg"
+        >
+          {gameState === 'paused' ? '▶️ Resume' : '⏸️ Pause'}
+        </button>
+        <button
+          onClick={() => navigate('/home')}
+          className="bg-game-panel border-2 border-error text-error px-6 py-3 rounded-lg font-body text-lg"
+        >
+          🏠 Quit
+        </button>
+      </div>
+
+      {/* Mobile Touch Controls */}
+      <div className="flex justify-center space-x-8 mt-4 md:hidden">
+        <button
+          onTouchStart={handleJump}
+          className="bg-blue-500 text-white text-4xl w-20 h-20 rounded-full flex items-center justify-center"
+        >
+          ⬆️
+        </button>
+        <button
+          onTouchStart={handleDuck}
+          onTouchEnd={() => setIsDucking(false)}
+          className="bg-green-500 text-white text-4xl w-20 h-20 rounded-full flex items-center justify-center"
+        >
+          ⬇️
+        </button>
       </div>
 
       {/* Pishachni Warning Overlay */}
@@ -311,8 +449,8 @@ return (
           >
             <motion.div
               animate={{ 
-                scale: [1, 1.2, 1],
-                rotate: [0, -5, 5, 0]
+                scale: [1, 1.3, 1],
+                rotate: [0, -10, 10, 0]
               }}
               transition={{ duration: 0.5 }}
               className="text-9xl"
@@ -324,7 +462,7 @@ return (
               animate={{ y: 0, opacity: 1 }}
               className="absolute bottom-32 text-4xl font-display text-error text-center glow-effect"
             >
-              PISHACHNI APPROACHES!
+              PISHACHNI IS CATCHING UP!
             </motion.p>
           </motion.div>
         )}
@@ -355,38 +493,11 @@ return (
               onClick={handlePause}
               className="bg-primary text-white px-8 py-4 rounded-2xl font-body text-xl border-4 border-primary hover:bg-purple-600"
             >
-              Resume Game
+              Resume Running
             </button>
           </div>
         </motion.div>
       )}
-
-      {/* Background ambiance */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        {[...Array(10)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute text-2xl opacity-10"
-            animate={{
-              x: [0, 50, -50, 0],
-              y: [0, -100, 50, 0],
-              rotate: [0, 180, 360],
-              opacity: [0.05, 0.15, 0.05],
-            }}
-            transition={{
-              duration: 8 + i * 1.5,
-              repeat: Infinity,
-              delay: i * 0.8,
-            }}
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
-          >
-            {['👻', '🎃', '🕷️', '🦇', '⚡', '✨', '💀', '🔮', '🕯️', '🌙'][i]}
-          </motion.div>
-        ))}
-      </div>
     </div>
   );
 };

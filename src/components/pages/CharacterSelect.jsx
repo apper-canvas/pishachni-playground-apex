@@ -67,9 +67,9 @@ const CharacterSelect = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="text-accent font-body text-lg max-w-md mx-auto"
+className="text-accent font-body text-lg max-w-md mx-auto"
           >
-            Pick your avatar and prepare to face Pishachni's hilarious haunts!
+            Pick your runner and prepare to escape Pishachni in an endless chase through India!
           </motion.p>
         </motion.div>
 
