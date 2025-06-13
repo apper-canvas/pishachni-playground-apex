@@ -1,0 +1,20 @@
+[
+  {
+    "id": "player-1",
+    "avatar": "avatar-2",
+    "highScore": 2850,
+    "unlockedItems": [
+      "avatar-1",
+      "avatar-2",
+      "avatar-3",
+      "garlic-necklace",
+      "banana-helmet"
+    ],
+    "achievements": [
+      "first-escape",
+      "garlic-master",
+      "dance-survivor",
+      "toilet-champion"
+    ]
+  }
+]

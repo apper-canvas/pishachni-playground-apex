@@ -1,0 +1,18 @@
+[
+  {
+    "id": "session-1",
+    "score": 1250,
+    "lives": 2,
+    "timeElapsed": 45000,
+    "currentRoom": "garlic-kitchen",
+    "activePowerUps": [
+      {
+        "type": "garlic-shield",
+        "activatedAt": 1640995200000,
+        "duration": 10000
+      }
+    ],
+    "isActive": true,
+    "playerId": "player-1"
+  }
+]

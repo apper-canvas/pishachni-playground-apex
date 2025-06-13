@@ -1,0 +1,57 @@
+[
+  {
+    "id": "minigame-1",
+    "roomId": "garlic-kitchen",
+    "taskType": "garlic-cooking",
+    "difficulty": 2,
+    "timeLimit": 30000,
+    "completed": false,
+    "description": "Chop garlic faster than Pishachni appears!",
+    "instructions": "Tap rapidly to chop garlic. Don't let Pishachni catch you!",
+    "successMessage": "Excellent chopping! The garlic aroma keeps Pishachni away!"
+  },
+  {
+    "id": "minigame-2",
+    "roomId": "dance-hall",
+    "taskType": "dance-battle",
+    "difficulty": 3,
+    "timeLimit": 45000,
+    "completed": false,
+    "description": "Mimic Pishachni's spooky dance moves",
+    "instructions": "Follow the dance sequence by tapping the highlighted areas",
+    "successMessage": "Your moves are so good, even Pishachni is impressed!"
+  },
+  {
+    "id": "minigame-3",
+    "roomId": "bathroom",
+    "taskType": "toilet-paper-mummy",
+    "difficulty": 1,
+    "timeLimit": 20000,
+    "completed": false,
+    "description": "Roll your avatar like a mummy to blend in",
+    "instructions": "Swipe in circles to wrap yourself in toilet paper",
+    "successMessage": "Perfect disguise! Pishachni can't tell you from the décor!"
+  },
+  {
+    "id": "minigame-4",
+    "roomId": "mirror-room",
+    "taskType": "mirror-madness",
+    "difficulty": 4,
+    "timeLimit": 35000,
+    "completed": false,
+    "description": "Answer silly riddles or get jump-scared",
+    "instructions": "Choose the funniest answer to each riddle",
+    "successMessage": "Your wit is sharper than Pishachni's claws!"
+  },
+  {
+    "id": "minigame-5",
+    "roomId": "mansion-entrance",
+    "taskType": "hide-and-seek",
+    "difficulty": 2,
+    "timeLimit": 25000,
+    "completed": false,
+    "description": "Find hiding spots before Pishachni arrives",
+    "instructions": "Tap objects to hide behind them when you hear footsteps",
+    "successMessage": "Sneaky! You're becoming quite the escape artist!"
+  }
+]
