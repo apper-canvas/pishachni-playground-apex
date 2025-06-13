@@ -6,7 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 function App() {
   return (
     <BrowserRouter>
-      <div className="h-screen bg-game-bg overflow-hidden">
+<div className="h-screen bg-game-bg scrollbar-theme">
         <Routes>
           {routeArray.map((route) => (
             <Route

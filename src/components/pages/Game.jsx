@@ -229,7 +229,7 @@ const Game = () => {
   }
 
 return (
-    <div className="min-h-screen bg-gradient-to-b from-game-bg to-purple-900 overflow-auto">
+<div className="min-h-screen bg-gradient-to-b from-game-bg to-purple-900 overflow-auto scrollbar-theme">
       {/* Game HUD */}
       <div className="relative z-20">
         <GameHUD
@@ -243,7 +243,7 @@ return (
       </div>
 
 {/* Main Game Area */}
-      <div className="flex-1 p-4 relative overflow-y-auto overflow-x-hidden">
+<div className="flex-1 p-4 relative overflow-y-auto overflow-x-hidden scrollbar-theme">
         <AnimatePresence mode="wait">
           {activeMiniGame ? (
             <motion.div

@@ -28,7 +28,7 @@ const CharacterSelect = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-game-bg to-purple-900 overflow-y-auto">
+<div className="min-h-screen bg-gradient-to-b from-game-bg to-purple-900 overflow-y-auto scrollbar-theme">
       <div className="container mx-auto px-6 py-8">
         {/* Header */}
         <motion.div

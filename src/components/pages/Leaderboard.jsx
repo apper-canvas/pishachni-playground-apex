@@ -112,7 +112,7 @@ const Leaderboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-game-bg to-purple-900 overflow-y-auto">
+<div className="min-h-screen bg-gradient-to-b from-game-bg to-purple-900 overflow-y-auto scrollbar-theme">
         <div className="container mx-auto px-6 py-8 max-w-4xl">
           <div className="text-center mb-8">
             <div className="h-8 bg-gradient-to-r from-purple-700 to-purple-600 rounded w-48 mx-auto mb-4 animate-pulse" />
@@ -151,7 +151,7 @@ const Leaderboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-game-bg to-purple-900 overflow-y-auto">
+<div className="min-h-screen bg-gradient-to-b from-game-bg to-purple-900 overflow-y-auto scrollbar-theme">
       <div className="container mx-auto px-6 py-8 max-w-4xl">
         {/* Header */}
         <motion.div
